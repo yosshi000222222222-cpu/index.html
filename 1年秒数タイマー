@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>31,536,000 Seconds</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
+        canvas { display: block; }
+        .ui {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: white; pointer-events: none; z-index: 10;
+        }
+        #counter { font-size: 3rem; font-weight: 100; text-shadow: 0 0 20px #ff00ea; }
+        .label { font-size: 0.8rem; letter-spacing: 3px; opacity: 0.6; margin-bottom: 5px; }
+        #permission-btn {
+            position: absolute; top: 10px; right: 10px; padding: 8px;
+            background: rgba(255,255,255,0.1); color: white; border: 1px solid white;
+            border-radius: 5px; font-size: 10px; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+<button id="permission-btn" onclick="requestPermission()">Sensor ON</button>
+
+<div class="ui">
+    <div class="label">REMAINING SECONDS</div>
+    <div id="counter">31,536,000</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const counterEl = document.getElementById('counter');
+
+    let width, height;
+    let particles = [];
+    let totalYearSeconds = 31536000;
+
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Particle {
+        constructor(isFlying = false) {
+            this.x = Math.random() * width;
+            this.y = isFlying ? height - Math.random() * 50 : -20;
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = isFlying ? -(Math.random() * 15 + 5) : Math.random() * 3 + 2;
+            this.size = Math.random() * 2 + 1;
+            this.color = `hsl(${280 + Math.random() * 60}, 100%, 70%)`;
+            this.life = 1.0;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vy += 0.2; // 疑似重力
+            if (this.y > height) return false;
+            return true;
+        }
+        draw() {
+            ctx.globalAlpha = this.life;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+        }
+    }
+
+    function animate() {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), 0, 1);
+        const end = new Date(now.getFullYear() + 1, 0, 1);
+        
+        const total = end - start;
+        const progress = now - start;
+        const secondsPassed = Math.floor(progress / 1000);
+        const secondsLeft = totalYearSeconds - secondsPassed;
+
+        counterEl.innerText = secondsLeft.toLocaleString();
+
+        // 描画
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, width, height);
+
+        // 1. 過ぎ去った時間を「地層」として描画
+        const ratio = secondsPassed / totalYearSeconds;
+        const pileHeight = height * ratio;
+        let grad = ctx.createLinearGradient(0, height - pileHeight, 0, height);
+        grad.addColorStop(0, 'rgba(255, 0, 234, 0.8)');
+        grad.addColorStop(1, 'rgba(76, 0, 255, 0.4)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, height - pileHeight, width, pileHeight);
+
+        // 2. 新しい秒数の粒を降らせる
+        if (Math.random() > 0.5) particles.push(new Particle(false));
+
+        // 3. 粒の更新と描画
+        particles = particles.filter(p => {
+            const alive = p.update();
+            if (alive) p.draw();
+            return alive;
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    // 振る動作
+    function requestPermission() {
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            DeviceMotionEvent.requestPermission().then(res => {
+                if (res === 'granted') window.addEventListener('devicemotion', shake);
+            });
+        } else {
+            window.addEventListener('devicemotion', shake);
+        }
+        document.getElementById('permission-btn').style.display = 'none';
+    }
+
+    function shake(e) {
+        let acc = e.accelerationIncludingGravity;
+        if (Math.abs(acc.x) + Math.abs(acc.y) > 20) {
+            for(let i=0; i<30; i++) particles.push(new Particle(true));
+        }
+    }
+
+    animate();
+</script>
+</body>
+</html>
