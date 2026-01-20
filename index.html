@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Progress Aqua Crystal</title>
+    <title>Neon Progress Aqua Crystal Pro</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
         canvas { display: block; }
@@ -36,8 +36,9 @@
             width: 100%;
         }
 
-        #total-seconds { font-size: 0.75rem; color: #ffffff; opacity: 0.3; font-weight: 100; }
-        #percentage { font-size: 0.85rem; color: #ffffff; opacity: 0.6; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+        /* 母数の色を明るく調整 (opacity 0.3 -> 0.6) */
+        #total-seconds { font-size: 0.75rem; color: #ffffff; opacity: 0.6; font-weight: 100; }
+        #percentage { font-size: 0.85rem; color: #ffffff; opacity: 0.8; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
 
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
@@ -82,12 +83,9 @@
     let particles = [];
     let pulses = [];
     let lastSecond = -1;
-    let currentWaveY = 0;
 
-    // 指定の配色設定
-    const COLOR_PARTICLE = 'rgba(0, 255, 255, 1)';
-    const COLOR_WAVE_TOP = 'rgba(0, 255, 255, 0.7)';    // 水面の水色
-    const COLOR_WAVE_BOTTOM = 'rgba(0, 10, 50, 0.8)';   // 底の濃紺
+    const COLOR_WAVE_TOP = 'rgba(0, 255, 255, 0.7)';
+    const COLOR_WAVE_BOTTOM = 'rgba(0, 10, 50, 0.9)';
 
     function resize() {
         width = canvas.width = window.innerWidth;
@@ -95,6 +93,11 @@
     }
     window.addEventListener('resize', resize);
     resize();
+
+    // 特定のX座標における現在の波のY座標を返す関数
+    function getWaveY(x, time, basePileY) {
+        return basePileY + Math.sin(x * 0.008 + time * 0.0008) * 6;
+    }
 
     class Particle {
         constructor(isFlying = false) {
@@ -110,19 +113,22 @@
             this.life = 1.0; 
             this.floatOffset = Math.random() * Math.PI * 2;
         }
-        update(pileY) {
+        update(time, basePileY) {
+            const currentYAtX = getWaveY(this.x, time, basePileY);
+
             if (!this.isAbsorbed) {
                 this.x += this.vx;
                 this.y += this.vy;
                 if (this.y > -20) this.vy += 0.1;
-                if (this.y >= pileY) {
+                
+                // 波の高さに合わせて吸収
+                if (this.y >= currentYAtX) {
                     this.isAbsorbed = true;
-                    this.y = pileY;
+                    this.y = currentYAtX;
                 }
             } else {
-                // 水面をゆっくり漂う
-                this.y = pileY + Math.sin(Date.now() * 0.001 + this.floatOffset) * 2;
-                this.life -= 0.01;
+                this.y = currentYAtX + Math.sin(Date.now() * 0.001 + this.floatOffset) * 2;
+                this.life -= 0.012;
                 this.size *= 0.99;
             }
             return this.life > 0;
@@ -132,7 +138,7 @@
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(0, 255, 255, ${this.life})`;
             if (!this.isAbsorbed) {
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 8;
                 ctx.shadowColor = 'cyan';
             }
             ctx.fill();
@@ -140,26 +146,24 @@
         }
     }
 
-    class Pulse {
-        constructor(startY) {
+    class FlashPulse {
+        constructor() {
             this.x = width / 2;
-            this.y = startY;
+            this.y = height / 2;
             this.r = 0;
-            this.opacity = 0.8;
+            this.opacity = 1.0;
         }
         update() {
-            this.r += 3; // パルスも少しゆっくりに
-            this.opacity -= 0.006;
+            this.r += 15; // 素早く拡大
+            this.opacity -= 0.02; // 素早く消える
             return this.opacity > 0;
         }
         draw() {
-            ctx.save();
             ctx.beginPath();
-            ctx.ellipse(this.x, this.y, this.r * 2.5, this.r * 0.6, 0, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(0, 255, 255, ${this.opacity})`;
-            ctx.lineWidth = 2;
+            ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); // 正円
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
+            ctx.lineWidth = 4;
             ctx.stroke();
-            ctx.restore();
         }
     }
 
@@ -176,28 +180,28 @@
         totalEl.innerText = "/ " + currentTotalSec.toLocaleString();
         percentEl.innerText = "(" + ((secondsLeft / currentTotalSec) * 100).toFixed(4) + "%)";
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.fillRect(0, 0, width, height);
 
         const ratio = secondsPassed / currentTotalSec;
         const basePileY = height - (height * ratio);
-        // 波のスピードを大幅にダウン (0.002 -> 0.0008)
-        currentWaveY = basePileY + Math.sin(time * 0.0008) * 8;
+        const centerWaveY = getWaveY(width/2, time, basePileY);
 
+        // 60秒パルス（正円・高速）
         if (secondsLeft % 60 === 0 && secondsLeft !== lastSecond) {
-            pulses.push(new Pulse(currentWaveY));
+            pulses.push(new FlashPulse());
             lastSecond = secondsLeft;
         }
 
-        let grad = ctx.createLinearGradient(0, currentWaveY, 0, height);
+        // 地層の描画
+        let grad = ctx.createLinearGradient(0, centerWaveY - 20, 0, height);
         grad.addColorStop(0, COLOR_WAVE_TOP);
         grad.addColorStop(1, COLOR_WAVE_BOTTOM);
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.moveTo(0, currentWaveY);
-        // 波の揺らぎもなだらかに
-        for(let x=0; x<=width; x+=10) {
-            ctx.lineTo(x, currentWaveY + Math.sin(x * 0.008 + time * 0.0008) * 6);
+        ctx.moveTo(0, getWaveY(0, time, basePileY));
+        for(let x=10; x<=width; x+=10) {
+            ctx.lineTo(x, getWaveY(x, time, basePileY));
         }
         ctx.lineTo(width, height);
         ctx.lineTo(0, height);
@@ -205,8 +209,14 @@
 
         if (Math.random() > 0.8) particles.push(new Particle());
         
-        particles = particles.filter(p => { if (p.update(currentWaveY)) { p.draw(); return true; } return false; });
-        pulses = pulses.filter(p => { if (p.update()) { p.draw(); return true; } return false; });
+        particles = particles.filter(p => { 
+            if (p.update(time, basePileY)) { p.draw(); return true; } 
+            return false; 
+        });
+        pulses = pulses.filter(p => { 
+            if (p.update()) { p.draw(); return true; } 
+            return false; 
+        });
 
         requestAnimationFrame(animate);
     }
