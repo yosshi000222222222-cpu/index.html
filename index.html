@@ -3,44 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Progress Crystal Pro</title>
+    <title>Neon Progress Aqua Crystal</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
         canvas { display: block; }
         
-        /* タイマー全体のコンテナ */
         .ui-container {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
             display: flex; flex-direction: column; align-items: center;
             color: white; pointer-events: none; z-index: 10; width: 95%;
         }
 
-        /* メインタイマーエリア */
         .main-timer-wrapper {
             position: relative;
-            display: inline-block;
+            text-align: center;
         }
 
         #counter { 
             font-size: 3.5rem; font-weight: 100; color: #ffffff; 
             text-shadow: 0 0 20px rgba(255,255,255,0.8); 
             margin: 0;
-            line-height: 1;
+            line-height: 1.1;
         }
 
-        /* タイマーの右下に配置する統計情報 */
         .sub-stats {
-            position: absolute;
-            right: -10px; /* 右側に少しはみ出す程度 */
-            bottom: -15px; /* メイン数字のすぐ下 */
-            text-align: right;
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+            gap: 12px;
             font-family: 'Courier New', Courier, monospace;
+            width: 100%;
         }
 
-        #total-seconds { font-size: 0.7rem; color: #ffffff; opacity: 0.3; font-weight: 100; display: block; }
-        #percentage { font-size: 0.8rem; color: #ffffff; opacity: 0.6; text-shadow: 0 0 5px rgba(255,255,255,0.5); display: block; }
+        #total-seconds { font-size: 0.75rem; color: #ffffff; opacity: 0.3; font-weight: 100; }
+        #percentage { font-size: 0.85rem; color: #ffffff; opacity: 0.6; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
 
-        .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 15px; }
+        .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
         #permission-btn {
             position: absolute; top: 25px; right: 25px;
@@ -64,8 +63,8 @@
     <div class="main-timer-wrapper">
         <div id="counter">0</div>
         <div class="sub-stats">
-            <div id="total-seconds">/ 0</div>
-            <div id="percentage">(0.0000%)</div>
+            <span id="total-seconds">/ 0</span>
+            <span id="percentage">(0.0000%)</span>
         </div>
     </div>
 </div>
@@ -82,13 +81,13 @@
     let width, height;
     let particles = [];
     let pulses = [];
-    let miniPulses = [];
     let lastSecond = -1;
     let currentWaveY = 0;
 
+    // 指定の配色設定
     const COLOR_PARTICLE = 'rgba(0, 255, 255, 1)';
-    const COLOR_WAVE_TOP = 'rgba(0, 100, 255, 0.7)';
-    const COLOR_WAVE_BOTTOM = 'rgba(0, 20, 100, 0.3)';
+    const COLOR_WAVE_TOP = 'rgba(0, 255, 255, 0.7)';    // 水面の水色
+    const COLOR_WAVE_BOTTOM = 'rgba(0, 10, 50, 0.8)';   // 底の濃紺
 
     function resize() {
         width = canvas.width = window.innerWidth;
@@ -119,11 +118,11 @@
                 if (this.y >= pileY) {
                     this.isAbsorbed = true;
                     this.y = pileY;
-                    if (Math.random() > 0.4) miniPulses.push(new MiniPulse(this.x, pileY));
                 }
             } else {
-                this.y = pileY + Math.sin(Date.now() * 0.005 + this.floatOffset) * 2;
-                this.life -= 0.015;
+                // 水面をゆっくり漂う
+                this.y = pileY + Math.sin(Date.now() * 0.001 + this.floatOffset) * 2;
+                this.life -= 0.01;
                 this.size *= 0.99;
             }
             return this.life > 0;
@@ -141,43 +140,24 @@
         }
     }
 
-    class MiniPulse {
-        constructor(x, y) {
-            this.x = x; this.y = y;
-            this.r = 0; this.opacity = 0.4;
-        }
-        update() {
-            this.r += 0.8;
-            this.opacity -= 0.015;
-            return this.opacity > 0;
-        }
-        draw() {
-            ctx.beginPath();
-            ctx.ellipse(this.x, this.y, this.r * 2.5, this.r * 0.6, 0, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(0, 255, 255, ${this.opacity})`;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-    }
-
     class Pulse {
         constructor(startY) {
             this.x = width / 2;
             this.y = startY;
             this.r = 0;
-            this.opacity = 1;
+            this.opacity = 0.8;
         }
         update() {
-            this.r += 4;
-            this.opacity -= 0.008;
+            this.r += 3; // パルスも少しゆっくりに
+            this.opacity -= 0.006;
             return this.opacity > 0;
         }
         draw() {
             ctx.save();
             ctx.beginPath();
-            ctx.ellipse(this.x, this.y, this.r * 2, this.r * 0.5, 0, 0, Math.PI * 2);
+            ctx.ellipse(this.x, this.y, this.r * 2.5, this.r * 0.6, 0, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(0, 255, 255, ${this.opacity})`;
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2;
             ctx.stroke();
             ctx.restore();
         }
@@ -201,7 +181,8 @@
 
         const ratio = secondsPassed / currentTotalSec;
         const basePileY = height - (height * ratio);
-        currentWaveY = basePileY + Math.sin(time * 0.002) * 10;
+        // 波のスピードを大幅にダウン (0.002 -> 0.0008)
+        currentWaveY = basePileY + Math.sin(time * 0.0008) * 8;
 
         if (secondsLeft % 60 === 0 && secondsLeft !== lastSecond) {
             pulses.push(new Pulse(currentWaveY));
@@ -214,8 +195,9 @@
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.moveTo(0, currentWaveY);
+        // 波の揺らぎもなだらかに
         for(let x=0; x<=width; x+=10) {
-            ctx.lineTo(x, currentWaveY + Math.sin(x * 0.01 + time * 0.002) * 5);
+            ctx.lineTo(x, currentWaveY + Math.sin(x * 0.008 + time * 0.0008) * 6);
         }
         ctx.lineTo(width, height);
         ctx.lineTo(0, height);
@@ -225,7 +207,6 @@
         
         particles = particles.filter(p => { if (p.update(currentWaveY)) { p.draw(); return true; } return false; });
         pulses = pulses.filter(p => { if (p.update()) { p.draw(); return true; } return false; });
-        miniPulses = miniPulses.filter(p => { if (p.update()) { p.draw(); return true; } return false; });
 
         requestAnimationFrame(animate);
     }
