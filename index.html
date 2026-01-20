@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Progress Timer</title>
+    <title>Neon Progress Pro</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
         canvas { display: block; }
@@ -11,21 +11,14 @@
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; color: white; pointer-events: none; z-index: 10; width: 90%;
         }
-        /* メインの残り秒数：大きく強調 */
-        #counter { font-size: 3.5rem; font-weight: 100; text-shadow: 0 0 20px #ff00ea; margin-bottom: 2px; }
+        #counter { font-size: 3.5rem; font-weight: 100; text-shadow: 0 0 20px rgba(255,255,255,0.5); margin-bottom: 2px; }
         .label { font-size: 0.6rem; letter-spacing: 2px; opacity: 0.5; margin-bottom: 8px; }
-        
-        /* 母数と％の行：小さく控えめに設定 */
         .stats-row {
             display: flex; justify-content: center; align-items: center; gap: 8px;
-            font-family: 'Courier New', Courier, monospace;
-            margin-top: 5px;
+            font-family: 'Courier New', Courier, monospace; margin-top: 5px;
         }
-        /* 母数のサイズを小さく (0.8rem) し、透明度を上げました */
         #total-seconds { font-size: 0.8rem; opacity: 0.3; font-weight: 100; }
-        /* ％のサイズも小さく (0.8rem) 調整 */
-        #percentage { font-size: 0.8rem; color: #ff00ea; opacity: 0.6; text-shadow: 0 0 5px #ff00ea; }
-        
+        #percentage { font-size: 0.8rem; opacity: 0.6; }
         #permission-btn {
             position: absolute; top: 20px; right: 20px; padding: 10px;
             background: rgba(255,255,255,0.1); color: white; border: 1px solid white;
@@ -56,8 +49,10 @@
     const totalEl = document.getElementById('total-seconds');
     const percentEl = document.getElementById('percentage');
 
-    let width, height;
+    let width, height, hue = 280;
     let particles = [];
+    let pulses = [];
+    let lastSecond = -1;
 
     function resize() {
         width = canvas.width = window.innerWidth;
@@ -76,73 +71,105 @@
             this.vx = (Math.random() - 0.5) * 2;
             this.vy = isFlying ? -(Math.random() * 15 + 5) : Math.random() * 2 + 1;
             this.size = Math.random() * 2 + 1;
-            this.color = `hsl(${280 + Math.random() * 60}, 100%, 70%)`;
+            this.color = `hsl(${hue}, 100%, 70%)`;
             this.isAbsorbed = false;
         }
         update(pileY) {
             this.x += this.vx;
             this.y += this.vy;
             if (this.y > -20) this.vy += 0.1;
-
             if (!this.isAbsorbed && this.y >= pileY) {
                 this.isAbsorbed = true;
-                this.vy = 0;
-                this.vx = 0;
-                this.y = pileY;
+                this.vy = 0; this.vx = 0; this.y = pileY;
             }
-            
-            if (this.isAbsorbed) {
-                this.size -= 0.1;
-            }
-
-            return this.size > 0 && this.y < height + 50;
+            if (this.isAbsorbed) this.size -= 0.1;
+            return this.size > 0;
         }
         draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.fillStyle = this.color;
-            ctx.shadowBlur = this.isAbsorbed ? 15 : 5;
-            ctx.shadowColor = this.color;
             ctx.fill();
-            ctx.shadowBlur = 0;
         }
     }
 
-    function animate() {
+    class Pulse {
+        constructor() {
+            this.r = 0;
+            this.opacity = 1;
+        }
+        update() {
+            this.r += 5;
+            this.opacity -= 0.01;
+            return this.opacity > 0;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(width/2, height/2, this.r, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+
+    function animate(time) {
         const now = new Date();
         const start = new Date(now.getFullYear(), 0, 1);
         const end = new Date(now.getFullYear() + 1, 0, 1);
         const totalMs = end - start;
         const currentTotalSec = Math.floor(totalMs / 1000);
-        
-        const progress = now - start;
-        const secondsPassed = Math.floor(progress / 1000);
+        const secondsPassed = Math.floor((now - start) / 1000);
         const secondsLeft = currentTotalSec - secondsPassed;
-        const percentLeft = (secondsLeft / currentTotalSec) * 100;
 
+        // 60秒ごとのエフェクト判定
+        if (secondsLeft % 60 === 0 && secondsLeft !== lastSecond) {
+            pulses.push(new Pulse());
+            lastSecond = secondsLeft;
+        }
+
+        // UI更新
         counterEl.innerText = secondsLeft.toLocaleString();
         totalEl.innerText = "/ " + currentTotalSec.toLocaleString();
-        percentEl.innerText = "(" + percentLeft.toFixed(4) + "%)";
+        percentEl.innerText = "(" + ((secondsLeft / currentTotalSec) * 100).toFixed(4) + "%)";
+        counterEl.style.color = `hsl(${hue}, 100%, 80%)`;
+        percentEl.style.color = `hsl(${hue}, 100%, 70%)`;
 
-        ctx.fillStyle = 'black';
+        // 背景（残像を作るために薄く塗りつぶす）
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.fillRect(0, 0, width, height);
 
+        // 色の変化
+        hue = (hue + 0.2) % 360;
+
+        // 地層（波打ちアニメーション）
         const ratio = secondsPassed / currentTotalSec;
-        const pileHeight = height * ratio;
-        const pileY = height - pileHeight;
+        const basePileY = height - (height * ratio);
+        const waveY = basePileY + Math.sin(time * 0.002) * 10;
 
-        let grad = ctx.createLinearGradient(0, pileY, 0, height);
-        grad.addColorStop(0, 'rgba(255, 0, 234, 0.6)');
-        grad.addColorStop(1, 'rgba(76, 0, 255, 0.2)');
+        let grad = ctx.createLinearGradient(0, waveY, 0, height);
+        grad.addColorStop(0, `hsla(${hue}, 100%, 50%, 0.6)`);
+        grad.addColorStop(1, `hsla(${(hue+40)%360}, 100%, 20%, 0.2)`);
         ctx.fillStyle = grad;
-        ctx.fillRect(0, pileY, width, pileHeight);
+        ctx.beginPath();
+        ctx.moveTo(0, waveY);
+        for(let x=0; x<=width; x+=10) {
+            ctx.lineTo(x, waveY + Math.sin(x * 0.01 + time * 0.002) * 5);
+        }
+        ctx.lineTo(width, height);
+        ctx.lineTo(0, height);
+        ctx.fill();
 
-        if (Math.random() > 0.8) particles.push(new Particle(false));
-
+        // 粒の追加と更新
+        if (Math.random() > 0.8) particles.push(new Particle());
         particles = particles.filter(p => {
-            const alive = p.update(pileY);
-            if (alive) p.draw();
-            return alive;
+            if (p.update(waveY)) { p.draw(); return true; }
+            return false;
+        });
+
+        // 60秒パルスの更新
+        pulses = pulses.filter(p => {
+            if (p.update()) { p.draw(); return true; }
+            return false;
         });
 
         requestAnimationFrame(animate);
@@ -166,7 +193,7 @@
         }
     }
 
-    animate();
+    animate(0);
 </script>
 </body>
 </html>
