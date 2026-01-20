@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Aqua Glass Pro</title>
+    <title>Neon Aqua Glass Final</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
         
-        /* タイマーコンテナ：水滴があるときにボケる */
         .ui-container {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
             display: flex; flex-direction: column; align-items: center;
@@ -16,8 +15,7 @@
             transition: backdrop-filter 0.5s ease;
         }
 
-        /* 水滴がついた時のボケ効果クラス */
-        .wet-blur { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        .wet-blur { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
 
         .main-timer-wrapper { position: relative; text-align: center; }
         #counter { font-size: 3.5rem; font-weight: 100; color: #ffffff; text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; }
@@ -26,32 +24,27 @@
         #percentage { font-size: 0.85rem; color: #ffffff; opacity: 0.8; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
-        .motion-toggle { position: absolute; top: 25px; left: 25px; z-index: 100; display: flex; align-items: center; gap: 8px; cursor: pointer; pointer-events: auto; }
-        .motion-toggle input { display: none; }
-        .slider { width: 34px; height: 18px; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,255,255,0.3); border-radius: 10px; position: relative; transition: .3s; }
-        .slider:before { content: ""; position: absolute; height: 12px; width: 12px; left: 2px; bottom: 2px; background: #fff; border-radius: 50%; transition: .3s; }
-        input:checked + .slider { background: rgba(0,255,255,0.3); border-color: #00ffff; }
-        input:checked + .slider:before { transform: translateX(16px); background: #00ffff; box-shadow: 0 0 10px #00ffff; }
-        .toggle-label { color: #00ffff; font-size: 9px; font-weight: bold; letter-spacing: 1px; opacity: 0.7; }
-
-        #permission-btn {
-            position: absolute; top: 25px; right: 25px; width: 50px; height: 50px;
-            background: transparent; color: #00ffff; border: 1px solid rgba(0, 255, 255, 0.5);
-            border-radius: 50%; font-size: 9px; font-weight: bold; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; z-index: 100; transition: all 0.3s ease; text-align: center; line-height: 1.1;
+        /* 進化したシェイクボタン */
+        #shake-toggle {
+            position: absolute; top: 25px; right: 25px; width: 60px; height: 60px;
+            background: rgba(20, 20, 20, 0.8); border: 2px solid #550000;
+            border-radius: 50%; font-size: 8px; font-weight: bold; display: flex;
+            align-items: center; justify-content: center; cursor: pointer;
+            z-index: 100; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center; line-height: 1.1; color: #550000;
         }
-        #permission-btn::before { content: "ACTIVATE\nSENSOR"; white-space: pre; }
+        #shake-toggle.active {
+            border-color: #00ffff; color: #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.6), inset 0 0 10px rgba(0, 255, 255, 0.4);
+            transform: scale(1.05);
+        }
+        #shake-toggle::before { content: "SHAKE\nOFF"; white-space: pre; }
+        #shake-toggle.active::before { content: "SHAKE\nON"; }
     </style>
 </head>
 <body>
 
-<label class="motion-toggle">
-    <input type="checkbox" id="motionSwitch" checked>
-    <div class="slider"></div>
-    <span class="toggle-label">MOTION</span>
-</label>
-
-<button id="permission-btn" onclick="requestPermission()"></button>
+<div id="shake-toggle" onclick="toggleShake()"></div>
 
 <div class="ui-container" id="uiContainer">
     <div class="label">REMAINING SECONDS</div>
@@ -73,7 +66,7 @@
     const totalEl = document.getElementById('total-seconds');
     const percentEl = document.getElementById('percentage');
     const uiContainer = document.getElementById('uiContainer');
-    const motionSwitch = document.getElementById('motionSwitch');
+    const shakeBtn = document.getElementById('shake-toggle');
 
     let width, height;
     let particles = [];
@@ -81,6 +74,7 @@
     let droplets = [];
     let lastSecond = -1;
     let audioCtx = null;
+    let shakeEnabled = false;
 
     const COLOR_WAVE_TOP = 'rgba(0, 255, 255, 0.7)';
     const COLOR_WAVE_BOTTOM = 'rgba(0, 10, 50, 0.9)';
@@ -92,47 +86,44 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // 水滴クラス
     class Droplet {
         constructor() {
             this.x = Math.random() * width;
             this.y = Math.random() * height;
-            this.r = Math.random() * 5 + 2;
+            // サイズをまばらに (1px〜8px)
+            this.r = Math.random() * Math.random() * 7 + 1;
             this.life = 1.0;
-            this.vy = Math.random() * 0.5 + 0.2; // ゆっくり垂れる
+            this.vy = this.r * 0.05; // 大きいほど少し早く垂れる
         }
         update() {
             this.y += this.vy;
-            this.life -= 0.002;
+            this.life -= 0.0015;
             return this.life > 0;
         }
         draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.2})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.25})`;
             ctx.fill();
-            // ハイライト
+            // ガラスに張り付いた反射光
             ctx.beginPath();
             ctx.arc(this.x - this.r*0.3, this.y - this.r*0.3, this.r*0.2, 0, Math.PI*2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.4})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.5})`;
             ctx.fill();
         }
     }
 
-    // 効果音生成
     function playSplashSound() {
         if (!audioCtx) return;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(100 + Math.random() * 200, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.3);
+        osc.frequency.setValueAtTime(80 + Math.random() * 150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
     }
 
     function getWaveY(x, time, basePileY) {
@@ -177,9 +168,9 @@
         update() { this.r += 20; this.y -= 10; this.opacity -= 0.03; return this.opacity > 0; }
         draw() {
             ctx.beginPath();
-            ctx.ellipse(this.x, this.y, this.r * 1.2, this.r, 0, 0, Math.PI * 2);
+            ctx.ellipse(this.x, this.y, this.r * 1.5, this.r, 0, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
-            ctx.lineWidth = 3; ctx.stroke();
+            ctx.lineWidth = 2; ctx.stroke();
         }
     }
 
@@ -218,7 +209,6 @@
         particles = particles.filter(p => { if (p.update(time, basePileY)) { p.draw(); return true; } return false; });
         pulses = pulses.filter(p => { if (p.update()) { p.draw(); return true; } return false; });
         
-        // 水滴の処理
         if (droplets.length > 0) uiContainer.classList.add('wet-blur');
         else uiContainer.classList.remove('wet-blur');
         droplets = droplets.filter(d => { if (d.update()) { d.draw(); return true; } return false; });
@@ -226,26 +216,30 @@
         requestAnimationFrame(animate);
     }
 
-    function requestPermission() {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (typeof DeviceMotionEvent.requestPermission === 'function') {
-            DeviceMotionEvent.requestPermission().then(res => {
-                if (res === 'granted') window.addEventListener('devicemotion', shake);
-            });
+    async function toggleShake() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        if (!shakeEnabled) {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                const res = await DeviceMotionEvent.requestPermission();
+                if (res !== 'granted') return;
+            }
+            window.addEventListener('devicemotion', handleShake);
+            shakeEnabled = true;
+            shakeBtn.classList.add('active');
         } else {
-            window.addEventListener('devicemotion', shake);
+            window.removeEventListener('devicemotion', handleShake);
+            shakeEnabled = false;
+            shakeBtn.classList.remove('active');
         }
-        document.getElementById('permission-btn').style.display = 'none';
     }
 
-    function shake(e) {
-        if (!motionSwitch.checked) return;
+    function handleShake(e) {
         let acc = e.accelerationIncludingGravity;
-        if (Math.abs(acc.x) + Math.abs(acc.y) > 20) {
+        if (Math.abs(acc.x) + Math.abs(acc.y) > 22) {
             playSplashSound();
             for(let i=0; i<30; i++) particles.push(new Particle(true));
-            // 水滴を追加
-            for(let i=0; i<5; i++) droplets.push(new Droplet());
+            for(let i=0; i<8; i++) droplets.push(new Droplet());
         }
     }
 
