@@ -3,18 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>31,536,000 Seconds</title>
+    <title>Neon Progress Timer</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
         canvas { display: block; }
         .ui {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: white; pointer-events: none; z-index: 10;
+            text-align: center; color: white; pointer-events: none; z-index: 10; width: 90%;
         }
-        #counter { font-size: 3rem; font-weight: 100; text-shadow: 0 0 20px #ff00ea; }
-        .label { font-size: 0.8rem; letter-spacing: 3px; opacity: 0.6; margin-bottom: 5px; }
+        /* メインの残り秒数：大きく強調 */
+        #counter { font-size: 3.5rem; font-weight: 100; text-shadow: 0 0 20px #ff00ea; margin-bottom: 2px; }
+        .label { font-size: 0.6rem; letter-spacing: 2px; opacity: 0.5; margin-bottom: 8px; }
+        
+        /* 母数と％の行：小さく控えめに設定 */
+        .stats-row {
+            display: flex; justify-content: center; align-items: center; gap: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            margin-top: 5px;
+        }
+        /* 母数のサイズを小さく (0.8rem) し、透明度を上げました */
+        #total-seconds { font-size: 0.8rem; opacity: 0.3; font-weight: 100; }
+        /* ％のサイズも小さく (0.8rem) 調整 */
+        #percentage { font-size: 0.8rem; color: #ff00ea; opacity: 0.6; text-shadow: 0 0 5px #ff00ea; }
+        
         #permission-btn {
-            position: absolute; top: 10px; right: 10px; padding: 8px;
+            position: absolute; top: 20px; right: 20px; padding: 10px;
             background: rgba(255,255,255,0.1); color: white; border: 1px solid white;
             border-radius: 5px; font-size: 10px; z-index: 100;
         }
@@ -25,8 +38,13 @@
 <button id="permission-btn" onclick="requestPermission()">Sensor ON</button>
 
 <div class="ui">
-    <div class="label">REMAINING SECONDS</div>
-    <div id="counter">31,536,000</div>
+    <div class="label">REMAINING / TOTAL SECONDS</div>
+    <div id="counter">0</div>
+    <div style="width: 40%; height: 1px; background: rgba(255,255,255,0.15); margin: 10px auto;"></div>
+    <div class="stats-row">
+        <div id="total-seconds">/ 0</div>
+        <div id="percentage">(0.0000%)</div>
+    </div>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -35,10 +53,11 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const counterEl = document.getElementById('counter');
+    const totalEl = document.getElementById('total-seconds');
+    const percentEl = document.getElementById('percentage');
 
     let width, height;
     let particles = [];
-    let totalYearSeconds = 31536000;
 
     function resize() {
         width = canvas.width = window.innerWidth;
@@ -49,27 +68,43 @@
 
     class Particle {
         constructor(isFlying = false) {
+            this.init(isFlying);
+        }
+        init(isFlying) {
             this.x = Math.random() * width;
-            this.y = isFlying ? height - Math.random() * 50 : -20;
+            this.y = isFlying ? height - 50 : -20;
             this.vx = (Math.random() - 0.5) * 2;
-            this.vy = isFlying ? -(Math.random() * 15 + 5) : Math.random() * 3 + 2;
+            this.vy = isFlying ? -(Math.random() * 15 + 5) : Math.random() * 2 + 1;
             this.size = Math.random() * 2 + 1;
             this.color = `hsl(${280 + Math.random() * 60}, 100%, 70%)`;
-            this.life = 1.0;
+            this.isAbsorbed = false;
         }
-        update() {
+        update(pileY) {
             this.x += this.vx;
             this.y += this.vy;
-            this.vy += 0.2; // 疑似重力
-            if (this.y > height) return false;
-            return true;
+            if (this.y > -20) this.vy += 0.1;
+
+            if (!this.isAbsorbed && this.y >= pileY) {
+                this.isAbsorbed = true;
+                this.vy = 0;
+                this.vx = 0;
+                this.y = pileY;
+            }
+            
+            if (this.isAbsorbed) {
+                this.size -= 0.1;
+            }
+
+            return this.size > 0 && this.y < height + 50;
         }
         draw() {
-            ctx.globalAlpha = this.life;
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.fillStyle = this.color;
+            ctx.shadowBlur = this.isAbsorbed ? 15 : 5;
+            ctx.shadowColor = this.color;
             ctx.fill();
+            ctx.shadowBlur = 0;
         }
     }
 
@@ -77,33 +112,35 @@
         const now = new Date();
         const start = new Date(now.getFullYear(), 0, 1);
         const end = new Date(now.getFullYear() + 1, 0, 1);
+        const totalMs = end - start;
+        const currentTotalSec = Math.floor(totalMs / 1000);
         
-        const total = end - start;
         const progress = now - start;
         const secondsPassed = Math.floor(progress / 1000);
-        const secondsLeft = totalYearSeconds - secondsPassed;
+        const secondsLeft = currentTotalSec - secondsPassed;
+        const percentLeft = (secondsLeft / currentTotalSec) * 100;
 
         counterEl.innerText = secondsLeft.toLocaleString();
+        totalEl.innerText = "/ " + currentTotalSec.toLocaleString();
+        percentEl.innerText = "(" + percentLeft.toFixed(4) + "%)";
 
-        // 描画
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, width, height);
 
-        // 1. 過ぎ去った時間を「地層」として描画
-        const ratio = secondsPassed / totalYearSeconds;
+        const ratio = secondsPassed / currentTotalSec;
         const pileHeight = height * ratio;
-        let grad = ctx.createLinearGradient(0, height - pileHeight, 0, height);
-        grad.addColorStop(0, 'rgba(255, 0, 234, 0.8)');
-        grad.addColorStop(1, 'rgba(76, 0, 255, 0.4)');
+        const pileY = height - pileHeight;
+
+        let grad = ctx.createLinearGradient(0, pileY, 0, height);
+        grad.addColorStop(0, 'rgba(255, 0, 234, 0.6)');
+        grad.addColorStop(1, 'rgba(76, 0, 255, 0.2)');
         ctx.fillStyle = grad;
-        ctx.fillRect(0, height - pileHeight, width, pileHeight);
+        ctx.fillRect(0, pileY, width, pileHeight);
 
-        // 2. 新しい秒数の粒を降らせる
-        if (Math.random() > 0.5) particles.push(new Particle(false));
+        if (Math.random() > 0.8) particles.push(new Particle(false));
 
-        // 3. 粒の更新と描画
         particles = particles.filter(p => {
-            const alive = p.update();
+            const alive = p.update(pileY);
             if (alive) p.draw();
             return alive;
         });
@@ -111,7 +148,6 @@
         requestAnimationFrame(animate);
     }
 
-    // 振る動作
     function requestPermission() {
         if (typeof DeviceMotionEvent.requestPermission === 'function') {
             DeviceMotionEvent.requestPermission().then(res => {
@@ -126,7 +162,7 @@
     function shake(e) {
         let acc = e.accelerationIncludingGravity;
         if (Math.abs(acc.x) + Math.abs(acc.y) > 20) {
-            for(let i=0; i<30; i++) particles.push(new Particle(true));
+            for(let i=0; i<20; i++) particles.push(new Particle(true));
         }
     }
 
