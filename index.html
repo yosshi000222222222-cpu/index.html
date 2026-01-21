@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Aqua Glass Scale Edition</title>
+    <title>Neon Aqua Glass - Robust Scale</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -18,34 +18,27 @@
 
         .main-timer-wrapper { position: relative; text-align: center; width: 100%; }
         
-        /* 文字サイズを3.5remに固定 */
+        /* 安定版サイズ 3.5rem */
         #counter { 
-            font-size: 3.5rem; font-weight: 100; color: #ffffff; 
+            font-size: 3.5rem; font-weight: bold; color: #ffffff; 
             text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; 
         }
         
         .sub-stats { margin-top: 15px; display: flex; justify-content: center; align-items: baseline; gap: 12px; width: 100%; }
-        #total-seconds { font-size: 0.75rem; color: #ffffff; opacity: 0.6; font-weight: 100; }
-        #percentage { font-size: 0.85rem; color: #ffffff; opacity: 0.8; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+        #total-seconds { font-size: 0.75rem; color: #ffffff; opacity: 0.6; }
+        #percentage { font-size: 0.85rem; color: #00ffff; text-shadow: 0 0 5px rgba(0,255,255,0.5); }
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
-        /* デイリーゲージを幅いっぱいに */
+        /* デイリーゲージ（幅いっぱい） */
         .day-progress-group {
-            margin-top: 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
+            margin-top: 45px; display: flex; flex-direction: column; align-items: center; width: 100%;
         }
         .day-gauge-container {
-            width: 100%; height: 4px; background: rgba(255,255,255,0.05);
-            position: relative;
+            width: 100%; height: 4px; background: rgba(255,255,255,0.05); position: relative;
         }
         #day-bar {
-            height: 100%; width: 0%;
-            background: linear-gradient(90deg, transparent, #00ffff);
-            box-shadow: 0 0 15px #00ffff;
-            position: absolute; top: 0; left: 0; z-index: 2;
+            height: 100%; width: 0%; background: linear-gradient(90deg, transparent, #00ffff);
+            box-shadow: 0 0 15px #00ffff; position: absolute; top: 0; left: 0; z-index: 2;
         }
         
         /* 4時間ごとの目盛り */
@@ -54,40 +47,26 @@
             display: flex; justify-content: space-between; z-index: 3;
         }
         .mark {
-            width: 1px; height: 8px; background: rgba(0, 255, 255, 0.3);
-            position: relative; top: -2px;
+            width: 1px; height: 10px; background: rgba(0, 255, 255, 0.3); position: relative; top: -3px;
         }
         .mark::after {
-            content: attr(data-hour); position: absolute; top: 10px; left: 50%;
-            transform: translateX(-50%); font-size: 6px; color: rgba(0, 255, 255, 0.4);
+            content: attr(data-hour); position: absolute; top: 12px; left: 50%;
+            transform: translateX(-50%); font-size: 8px; color: rgba(0, 255, 255, 0.5);
         }
 
-        .day-label {
-            font-size: 0.5rem; color: #00ffff; opacity: 0.4; letter-spacing: 4px;
-            margin-bottom: 12px;
-        }
+        .day-label { font-size: 0.5rem; color: #00ffff; opacity: 0.4; letter-spacing: 4px; margin-bottom: 15px; }
 
-        /* 右上のトグルスイッチ */
+        /* SHAKEトグル */
         .shake-toggle-container {
-            position: absolute; top: 25px; right: 25px;
-            z-index: 100; display: flex; align-items: center; gap: 8px;
-            cursor: pointer; pointer-events: auto;
+            position: absolute; top: 25px; right: 25px; z-index: 100; display: flex; align-items: center; gap: 8px; cursor: pointer; pointer-events: auto;
         }
         .shake-toggle-container input { display: none; }
-        .slider {
-            width: 40px; height: 20px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,0,0,0.2);
-            border-radius: 10px; position: relative; transition: .3s;
-        }
-        .slider:before {
-            content: ""; position: absolute; height: 14px; width: 14px;
-            left: 2px; bottom: 2px; background: #440000; border-radius: 50%; transition: .3s;
-        }
+        .slider { width: 40px; height: 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,0,0,0.2); border-radius: 10px; position: relative; transition: .3s; }
+        .slider:before { content: ""; position: absolute; height: 14px; width: 14px; left: 2px; bottom: 2px; background: #440000; border-radius: 50%; transition: .3s; }
         input:checked + .slider { border-color: #00ffff; background: rgba(0,255,255,0.15); }
         input:checked + .slider:before { transform: translateX(20px); background: #00ffff; box-shadow: 0 0 10px #00ffff; }
-        .toggle-label { color: #440000; font-size: 9px; font-weight: bold; letter-spacing: 1px; transition: .3s; }
-        input:checked ~ .toggle-label { color: #00ffff; opacity: 0.8; }
+        .toggle-label { color: #440000; font-size: 9px; font-weight: bold; letter-spacing: 1px; }
+        input:checked ~ .toggle-label { color: #00ffff; }
     </style>
 </head>
 <body>
@@ -101,14 +80,14 @@
 <div class="ui-container" id="uiContainer">
     <div class="label">REMAINING SECONDS</div>
     <div class="main-timer-wrapper">
-        <div id="counter">---</div>
+        <div id="counter">calculating...</div>
         <div class="sub-stats">
             <span id="total-seconds"></span>
             <span id="percentage"></span>
         </div>
         
         <div class="day-progress-group">
-            <div class="day-label">DAILY PROGRESS (4H MARKS)</div>
+            <div class="day-label">DAILY PROGRESS</div>
             <div class="day-gauge-container">
                 <div id="day-bar"></div>
                 <div class="scale-marks">
@@ -139,6 +118,7 @@
 
     let width, height, audioCtx = null;
     let particles = [], droplets = [];
+    let currentRatio = 0;
 
     function resize() {
         width = canvas.width = window.innerWidth;
@@ -147,18 +127,50 @@
     window.addEventListener('resize', resize);
     resize();
 
+    // タイマー計算コア関数
+    function updateData() {
+        try {
+            const now = new Date();
+            const year = now.getFullYear();
+            const startOfYear = new Date(year, 0, 1).getTime();
+            const endOfYear = new Date(year + 1, 0, 1).getTime();
+            const nowMs = now.getTime();
+
+            const totalMs = endOfYear - startOfYear;
+            const remainingMs = Math.max(0, endOfYear - nowMs);
+            
+            const secondsLeft = Math.floor(remainingMs / 1000);
+            const totalSeconds = Math.floor(totalMs / 1000);
+            currentRatio = remainingMs / totalMs;
+
+            // UI反映
+            counterEl.textContent = secondsLeft.toLocaleString();
+            totalEl.textContent = "/ " + totalSeconds.toLocaleString();
+            percentEl.textContent = "(" + (currentRatio * 100).toFixed(4) + "%)";
+
+            // 1日の進捗
+            const startOfToday = new Date(year, now.getMonth(), now.getDate()).getTime();
+            const dayProgress = Math.min(1, Math.max(0, (nowMs - startOfToday) / (24 * 60 * 60 * 1000)));
+            dayBar.style.width = (dayProgress * 100) + "%";
+            
+        } catch (e) {
+            console.error("Timer update failed", e);
+        }
+    }
+
+    // パーティクル & 水滴クラス
     class Particle {
         constructor(isFlying = false) {
             this.x = Math.random() * width;
             this.y = isFlying ? height - 50 : -20;
             this.vx = (Math.random() - 0.5) * 2;
-            this.vy = isFlying ? -(Math.random() * 12 + 4) : Math.random() * 2 + 1;
+            this.vy = isFlying ? -(Math.random() * 12 + 5) : Math.random() * 2 + 1;
             this.size = Math.random() * 2 + 1;
             this.life = 1.0;
         }
         update(waveY) {
             this.x += this.vx; this.y += this.vy;
-            if (this.y >= waveY) { this.life -= 0.015; this.y = waveY; }
+            if (this.y >= waveY) { this.life -= 0.02; this.y = waveY; }
             return this.life > 0;
         }
         draw() {
@@ -170,9 +182,9 @@
     class Droplet {
         constructor() {
             this.x = Math.random() * width; this.y = Math.random() * height;
-            this.r = Math.random() * 6 + 1; this.life = 1.0; this.vy = this.r * 0.04;
+            this.r = Math.random() * 5 + 1; this.life = 1.0; this.vy = this.r * 0.05;
         }
-        update() { this.y += this.vy; this.life -= 0.0015; return this.life > 0; }
+        update() { this.y += this.vy; this.life -= 0.002; return this.life > 0; }
         draw() {
             ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.2})`;
             ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
@@ -180,4 +192,65 @@
     }
 
     function animate(t) {
-        const now = new
+        updateData(); // 毎フレーム最新の時間を取得
+
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, width, height);
+
+        const basePileY = height * (1 - currentRatio);
+        const waveY = basePileY + Math.sin(t * 0.002) * 5;
+
+        // 水の描画
+        let grad = ctx.createLinearGradient(0, basePileY - 50, 0, height);
+        grad.addColorStop(0, 'rgba(0, 255, 255, 0.6)');
+        grad.addColorStop(1, 'rgba(0, 20, 60, 0.9)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(0, waveY);
+        for(let x=0; x<=width; x+=20) ctx.lineTo(x, basePileY + Math.sin(x*0.01 + t*0.002)*6);
+        ctx.lineTo(width, height); ctx.lineTo(0, height); ctx.fill();
+
+        if (Math.random() > 0.8) particles.push(new Particle());
+        particles = particles.filter(p => { if (p.update(basePileY)) { p.draw(); return true; } return false; });
+        droplets = droplets.filter(d => { if (d.update()) { d.draw(); return true; } return false; });
+        
+        uiContainer.className = droplets.length > 0 ? "ui-container wet-blur" : "ui-container";
+
+        requestAnimationFrame(animate);
+    }
+
+    async function toggleShake() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (shakeSwitch.checked) {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const res = await DeviceMotionEvent.requestPermission();
+                    if (res !== 'granted') { shakeSwitch.checked = false; return; }
+                } catch(e) {}
+            }
+            window.addEventListener('devicemotion', handleShake);
+        } else {
+            window.removeEventListener('devicemotion', handleShake);
+        }
+    }
+
+    function handleShake(e) {
+        let acc = e.accelerationIncludingGravity;
+        if (acc && (Math.abs(acc.x) + Math.abs(acc.y) > 22)) {
+            if (audioCtx && audioCtx.state === 'running') {
+                const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                o.frequency.setValueAtTime(150, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.3);
+            }
+            for(let i=0; i<20; i++) particles.push(new Particle(true));
+            for(let i=0; i<4; i++) droplets.push(new Droplet());
+        }
+    }
+
+    // 初回実行
+    updateData();
+    animate(0);
+</script>
+</body>
+</html>
