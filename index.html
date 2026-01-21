@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Aqua Glass - Final Evolution</title>
+    <title>Neon Aqua Glass - Accumulate Edition</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -18,7 +18,6 @@
 
         .main-timer-wrapper { position: relative; text-align: center; width: 100%; }
         
-        /* 安定版サイズ 3.5rem */
         #counter { 
             font-size: 3.5rem; font-weight: bold; color: #ffffff; 
             text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; 
@@ -29,7 +28,6 @@
         #percentage { font-size: 0.85rem; color: #00ffff; text-shadow: 0 0 5px rgba(0,255,255,0.5); }
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
-        /* デイリーゲージ：幅いっぱい */
         .day-progress-group {
             margin-top: 50px; display: flex; flex-direction: column; width: 100%; position: relative;
         }
@@ -41,7 +39,6 @@
             box-shadow: 0 0 15px #00ffff; position: absolute; top: 0; left: 0; z-index: 2;
         }
         
-        /* 4時間ごとの目盛り */
         .scale-marks {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; justify-content: space-between; z-index: 3;
@@ -56,12 +53,11 @@
 
         .day-info-row {
             display: flex; justify-content: space-between; align-items: flex-end;
-            padding: 0 10px; margin-top: 15px;
+            padding: 0 15px; margin-top: 15px;
         }
         .day-label { font-size: 0.5rem; color: #00ffff; opacity: 0.4; letter-spacing: 2px; }
-        #day-percentage-text { font-size: 0.8rem; color: #00ffff; text-shadow: 0 0 8px #00ffff; font-weight: bold; }
+        #day-percentage-text { font-size: 0.85rem; color: #00ffff; text-shadow: 0 0 8px #00ffff; font-weight: bold; }
 
-        /* SHAKEトグル */
         .shake-toggle-container {
             position: absolute; top: 25px; right: 25px; z-index: 100; display: flex; align-items: center; gap: 8px; cursor: pointer; pointer-events: auto;
         }
@@ -85,7 +81,7 @@
 <div class="ui-container" id="uiContainer">
     <div class="label">REMAINING SECONDS</div>
     <div class="main-timer-wrapper">
-        <div id="counter">INITIALIZING...</div>
+        <div id="counter">---</div>
         <div class="sub-stats">
             <span id="total-seconds"></span>
             <span id="percentage"></span>
@@ -123,8 +119,9 @@
     const shakeSwitch = document.getElementById('shakeSwitch');
 
     let width, height, audioCtx = null;
-    let particles = [], droplets = [];
+    let particles = [], droplets = [], pulses = [];
     let currentYearRatio = 0;
+    let lastPulseSecond = -1;
 
     function resize() {
         width = canvas.width = window.innerWidth;
@@ -133,30 +130,21 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // 時間計算コア
-    function updateLogic() {
-        const now = new Date();
-        const year = now.getFullYear();
-        
-        // 1年の計算
-        const startYear = new Date(year, 0, 1).getTime();
-        const endYear = new Date(year + 1, 0, 1).getTime();
-        const nowMs = now.getTime();
-        const totalYearMs = endYear - startYear;
-        const remainingMs = Math.max(0, endYear - nowMs);
-        
-        currentYearRatio = remainingMs / totalYearMs;
-
-        // UI更新
-        counterEl.textContent = Math.floor(remainingMs / 1000).toLocaleString();
-        totalEl.textContent = "/ " + Math.floor(totalYearMs / 1000).toLocaleString();
-        percentEl.textContent = "(" + (currentYearRatio * 100).toFixed(4) + "%)";
-
-        // 1日の計算
-        const startDay = new Date(year, now.getMonth(), now.getDate()).getTime();
-        const dayPassedRatio = (nowMs - startDay) / (24 * 60 * 60 * 1000);
-        dayBar.style.width = (dayPassedRatio * 100) + "%";
-        dayPercentText.textContent = (dayPassedRatio * 100).toFixed(2) + "%";
+    // 60秒パルスエフェクト
+    class RisingPulse {
+        constructor(startY) {
+            this.x = width / 2; this.y = startY; this.r = 0; this.opacity = 1.0;
+        }
+        update() { 
+            this.r += 15; this.y -= 8; this.opacity -= 0.02; 
+            return this.opacity > 0; 
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.ellipse(this.x, this.y, this.r * 2, this.r, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
+            ctx.lineWidth = 1.5; ctx.stroke();
+        }
     }
 
     class Particle {
@@ -170,10 +158,7 @@
         }
         update(waveY) {
             this.x += this.vx; this.y += this.vy;
-            // 波面に当たったら即座に消える設定
-            if (this.y >= waveY) {
-                this.life = 0; 
-            }
+            if (this.y >= waveY) { this.life = 0; }
             return this.life > 0;
         }
         draw() {
@@ -195,15 +180,42 @@
     }
 
     function animate(t) {
-        updateLogic();
+        const now = new Date();
+        const year = now.getFullYear();
+        const startYear = new Date(year, 0, 1).getTime();
+        const endYear = new Date(year + 1, 0, 1).getTime();
+        const nowMs = now.getTime();
+        const totalYearMs = endYear - startYear;
+        const remainingMs = Math.max(0, endYear - nowMs);
+        const secondsLeft = Math.floor(remainingMs / 1000);
+        
+        currentYearRatio = remainingMs / totalYearMs;
 
+        // UI更新
+        counterEl.textContent = secondsLeft.toLocaleString();
+        totalEl.textContent = "/ " + Math.floor(totalYearMs / 1000).toLocaleString();
+        percentEl.textContent = "(" + (currentYearRatio * 100).toFixed(4) + "%)";
+
+        const startDay = new Date(year, now.getMonth(), now.getDate()).getTime();
+        const dayProgress = (nowMs - startDay) / (24 * 60 * 60 * 1000);
+        dayBar.style.width = (dayProgress * 100) + "%";
+        dayPercentText.textContent = (dayProgress * 100).toFixed(2) + "%";
+
+        // 背景描画
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, width, height);
 
-        // 波の高さ：1年の残り秒数にリンク（残りが多い＝水がたっぷり）
-        const basePileY = height * (1 - currentYearRatio);
+        // 水位の計算：秒数が減るほど水位が上がる (Ratio=1でbottom, Ratio=0でtop)
+        const basePileY = height * currentYearRatio; 
         const waveY = basePileY + Math.sin(t * 0.002) * 6;
 
+        // 60秒パルス判定
+        if (secondsLeft % 60 === 0 && secondsLeft !== lastPulseSecond) {
+            pulses.push(new RisingPulse(waveY));
+            lastPulseSecond = secondsLeft;
+        }
+
+        // 波の描画
         let grad = ctx.createLinearGradient(0, basePileY - 50, 0, height);
         grad.addColorStop(0, 'rgba(0, 255, 255, 0.6)');
         grad.addColorStop(1, 'rgba(0, 20, 60, 0.9)');
@@ -215,8 +227,10 @@
         }
         ctx.lineTo(width, height); ctx.lineTo(0, height); ctx.fill();
 
+        // 各種エフェクト更新
         if (Math.random() > 0.85) particles.push(new Particle());
         particles = particles.filter(p => { if (p.update(waveY)) { p.draw(); return true; } return false; });
+        pulses = pulses.filter(p => { if (p.update()) { p.draw(); return true; } return false; });
         droplets = droplets.filter(d => { if (d.update()) { d.draw(); return true; } return false; });
         
         uiContainer.className = droplets.length > 0 ? "ui-container wet-blur" : "ui-container";
@@ -244,18 +258,16 @@
         if (acc && (Math.abs(acc.x) + Math.abs(acc.y) > 22)) {
             if (audioCtx && audioCtx.state === 'running') {
                 const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-                o.frequency.setValueAtTime(150, audioCtx.currentTime);
+                o.frequency.setValueAtTime(120, audioCtx.currentTime);
                 g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
                 o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.3);
             }
-            const waveY = height * (1 - currentYearRatio);
+            const waveY = height * currentYearRatio;
             for(let i=0; i<20; i++) particles.push(new Particle(true));
-            for(let i=0; i<4; i++) droplets.push(new Droplet());
+            for(let i=0; i<5; i++) droplets.push(new Droplet());
         }
     }
 
-    // 強制開始
-    updateLogic();
     animate(0);
 </script>
 </body>
