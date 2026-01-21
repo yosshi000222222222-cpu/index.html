@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Aqua Glass Final</title>
+    <title>Neon Aqua Glass Reborn</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
         
         .ui-container {
@@ -18,41 +18,85 @@
         .wet-blur { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
 
         .main-timer-wrapper { position: relative; text-align: center; }
-        #counter { font-size: 3.5rem; font-weight: 100; color: #ffffff; text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; }
-        .sub-stats { margin-top: 15px; display: flex; justify-content: center; align-items: baseline; gap: 12px; font-family: 'Courier New', Courier, monospace; width: 100%; }
+        
+        #counter { 
+            font-size: 3.5rem; font-weight: 100; color: #ffffff; 
+            text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; 
+        }
+        
+        .sub-stats { margin-top: 15px; display: flex; justify-content: center; align-items: baseline; gap: 12px; width: 100%; }
         #total-seconds { font-size: 0.75rem; color: #ffffff; opacity: 0.6; font-weight: 100; }
         #percentage { font-size: 0.85rem; color: #ffffff; opacity: 0.8; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
-        /* 進化したシェイクボタン */
-        #shake-toggle {
-            position: absolute; top: 25px; right: 25px; width: 60px; height: 60px;
-            background: rgba(20, 20, 20, 0.8); border: 2px solid #550000;
-            border-radius: 50%; font-size: 8px; font-weight: bold; display: flex;
-            align-items: center; justify-content: center; cursor: pointer;
-            z-index: 100; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            text-align: center; line-height: 1.1; color: #550000;
+        /* 追加機能1: 1日の進捗ゲージ（中央配置） */
+        .day-progress-group {
+            margin-top: 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 200px;
         }
-        #shake-toggle.active {
-            border-color: #00ffff; color: #00ffff;
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.6), inset 0 0 10px rgba(0, 255, 255, 0.4);
-            transform: scale(1.05);
+        .day-gauge-container {
+            width: 100%; height: 3px; background: rgba(255,255,255,0.1);
+            border-radius: 2px; overflow: hidden;
         }
-        #shake-toggle::before { content: "SHAKE\nOFF"; white-space: pre; }
-        #shake-toggle.active::before { content: "SHAKE\nON"; }
+        #day-bar {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, transparent, #00ffff);
+            box-shadow: 0 0 8px #00ffff;
+        }
+        .day-label {
+            font-size: 0.5rem; color: #00ffff; opacity: 0.6; letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        /* 追加機能2: 右上のトグルスイッチ */
+        .shake-toggle-container {
+            position: absolute; top: 25px; right: 25px;
+            z-index: 100; display: flex; align-items: center; gap: 8px;
+            cursor: pointer; pointer-events: auto;
+        }
+        .shake-toggle-container input { display: none; }
+        .slider {
+            width: 40px; height: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,0,0,0.3);
+            border-radius: 10px; position: relative; transition: .3s;
+        }
+        .slider:before {
+            content: ""; position: absolute; height: 14px; width: 14px;
+            left: 2px; bottom: 2px; background: #550000; border-radius: 50%; transition: .3s;
+        }
+        input:checked + .slider { border-color: #00ffff; background: rgba(0,255,255,0.2); }
+        input:checked + .slider:before { transform: translateX(20px); background: #00ffff; box-shadow: 0 0 10px #00ffff; }
+        .toggle-label { color: #550000; font-size: 10px; font-weight: bold; letter-spacing: 1px; transition: .3s; }
+        input:checked ~ .toggle-label { color: #00ffff; }
+
     </style>
 </head>
 <body>
 
-<div id="shake-toggle" onclick="toggleShake()"></div>
+<label class="shake-toggle-container">
+    <input type="checkbox" id="shakeSwitch" onchange="toggleShake()">
+    <div class="slider"></div>
+    <span class="toggle-label">SHAKE</span>
+</label>
 
 <div class="ui-container" id="uiContainer">
     <div class="label">REMAINING SECONDS</div>
     <div class="main-timer-wrapper">
-        <div id="counter">0</div>
+        <div id="counter">Loading...</div>
         <div class="sub-stats">
-            <span id="total-seconds">/ 0</span>
-            <span id="percentage">(0.0000%)</span>
+            <span id="total-seconds"></span>
+            <span id="percentage"></span>
+        </div>
+        
+        <div class="day-progress-group">
+            <div class="day-label">TODAY'S PROGRESS</div>
+            <div class="day-gauge-container">
+                <div id="day-bar"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -65,8 +109,9 @@
     const counterEl = document.getElementById('counter');
     const totalEl = document.getElementById('total-seconds');
     const percentEl = document.getElementById('percentage');
+    const dayBar = document.getElementById('day-bar'); // 追加
     const uiContainer = document.getElementById('uiContainer');
-    const shakeBtn = document.getElementById('shake-toggle');
+    const shakeSwitch = document.getElementById('shakeSwitch'); // 追加
 
     let width, height;
     let particles = [];
@@ -74,7 +119,6 @@
     let droplets = [];
     let lastSecond = -1;
     let audioCtx = null;
-    let shakeEnabled = false;
 
     const COLOR_WAVE_TOP = 'rgba(0, 255, 255, 0.7)';
     const COLOR_WAVE_BOTTOM = 'rgba(0, 10, 50, 0.9)';
@@ -90,10 +134,9 @@
         constructor() {
             this.x = Math.random() * width;
             this.y = Math.random() * height;
-            // サイズをまばらに (1px〜8px)
             this.r = Math.random() * Math.random() * 7 + 1;
             this.life = 1.0;
-            this.vy = this.r * 0.05; // 大きいほど少し早く垂れる
+            this.vy = this.r * 0.05;
         }
         update() {
             this.y += this.vy;
@@ -105,7 +148,6 @@
             ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.25})`;
             ctx.fill();
-            // ガラスに張り付いた反射光
             ctx.beginPath();
             ctx.arc(this.x - this.r*0.3, this.y - this.r*0.3, this.r*0.2, 0, Math.PI*2);
             ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.5})`;
@@ -176,23 +218,32 @@
 
     function animate(time) {
         const now = new Date();
-        const start = new Date(now.getFullYear(), 0, 1);
-        const end = new Date(now.getFullYear() + 1, 0, 1);
-        const currentTotalSec = Math.floor((end - start) / 1000);
-        const secondsLeft = currentTotalSec - Math.floor((now - start) / 1000);
+        // 年の計算（ここが基盤です）
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        const yearEnd = new Date(now.getFullYear() + 1, 0, 1);
+        const yearTotalSec = Math.floor((yearEnd - yearStart) / 1000);
+        const yearSecondsLeft = yearTotalSec - Math.floor((now - yearStart) / 1000);
 
-        counterEl.innerText = secondsLeft.toLocaleString();
-        totalEl.innerText = "/ " + currentTotalSec.toLocaleString();
-        percentEl.innerText = "(" + ((secondsLeft / currentTotalSec) * 100).toFixed(4) + "%)";
+        // UI更新
+        counterEl.innerText = yearSecondsLeft.toLocaleString();
+        totalEl.innerText = "/ " + yearTotalSec.toLocaleString();
+        percentEl.innerText = "(" + ((yearSecondsLeft / yearTotalSec) * 100).toFixed(4) + "%)";
 
+        // 1日の計算（ここを追加しました）
+        const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const dayPassedSec = Math.floor((now - dayStart) / 1000);
+        const dayProgress = (dayPassedSec / 86400) * 100;
+        if(dayBar) dayBar.style.width = dayProgress + "%";
+
+        // 描画クリア
         ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.fillRect(0, 0, width, height);
 
-        const basePileY = height - (height * (1 - secondsLeft / currentTotalSec));
+        const basePileY = height - (height * (1 - yearSecondsLeft / yearTotalSec));
 
-        if (secondsLeft % 60 === 0 && secondsLeft !== lastSecond) {
+        if (yearSecondsLeft % 60 === 0 && yearSecondsLeft !== lastSecond) {
             pulses.push(new RisingPulse(getWaveY(width / 2, time, basePileY)));
-            lastSecond = secondsLeft;
+            lastSecond = yearSecondsLeft;
         }
 
         let grad = ctx.createLinearGradient(0, basePileY - 50, 0, height);
@@ -216,26 +267,32 @@
         requestAnimationFrame(animate);
     }
 
+    // シェイクのトグル処理
     async function toggleShake() {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
-        if (!shakeEnabled) {
-            if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                const res = await DeviceMotionEvent.requestPermission();
-                if (res !== 'granted') return;
+        // チェックボックスの状態を確認
+        if (shakeSwitch.checked) {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const res = await DeviceMotionEvent.requestPermission();
+                    if (res !== 'granted') {
+                        shakeSwitch.checked = false; // 許可されなければOFFに戻す
+                        return;
+                    }
+                } catch(e) {
+                    console.error(e);
+                }
             }
             window.addEventListener('devicemotion', handleShake);
-            shakeEnabled = true;
-            shakeBtn.classList.add('active');
         } else {
             window.removeEventListener('devicemotion', handleShake);
-            shakeEnabled = false;
-            shakeBtn.classList.remove('active');
         }
     }
 
     function handleShake(e) {
         let acc = e.accelerationIncludingGravity;
+        if (!acc) return;
         if (Math.abs(acc.x) + Math.abs(acc.y) > 22) {
             playSplashSound();
             for(let i=0; i<30; i++) particles.push(new Particle(true));
