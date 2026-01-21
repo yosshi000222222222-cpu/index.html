@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Aqua Glass - Fixed Timer</title>
+    <title>Neon Aqua Glass - Fixed Accumulate</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -14,7 +14,8 @@
             color: white; pointer-events: none; z-index: 10; width: 100%;
         }
 
-        /* タイマー文字サイズ：安定版 3.5rem */
+        .main-timer-wrapper { position: relative; text-align: center; width: 100%; }
+        
         #counter { 
             font-size: 3.5rem; font-weight: bold; color: #ffffff; 
             text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; 
@@ -25,9 +26,9 @@
         #percentage { font-size: 0.85rem; color: #00ffff; text-shadow: 0 0 5px rgba(0,255,255,0.5); }
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
-        /* プログレスゲージ：幅いっぱい */
+        /* デイリーゲージ：全幅 */
         .day-progress-group {
-            margin-top: 50px; display: flex; flex-direction: column; width: 100%; position: relative;
+            margin-top: 60px; display: flex; flex-direction: column; width: 100%; position: relative;
         }
         .day-gauge-container {
             width: 100%; height: 2px; background: rgba(255,255,255,0.1); position: relative;
@@ -37,25 +38,22 @@
             box-shadow: 0 0 15px #00ffff; position: absolute; top: 0; left: 0; z-index: 2;
         }
         
-        /* 4時間ごとの目盛り */
         .scale-marks {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; justify-content: space-between; z-index: 3;
         }
-        .mark {
-            width: 1px; height: 10px; background: rgba(0, 255, 255, 0.2); position: relative; top: -4px;
-        }
+        .mark { width: 1px; height: 10px; background: rgba(0, 255, 255, 0.2); position: relative; top: -4px; }
         .mark::after {
             content: attr(data-hour); position: absolute; top: 14px; left: 50%;
             transform: translateX(-50%); font-size: 8px; color: rgba(0, 255, 255, 0.4);
         }
 
-        /* デイリー情報の右下配置 */
+        /* ゲージのすぐ右下に配置 */
         .day-info-row {
-            display: flex; justify-content: flex-end; /* 右寄せ */
-            padding: 0 20px; margin-top: 10px;
+            display: flex; justify-content: flex-end; 
+            padding-right: 15px; margin-top: 12px;
         }
-        #day-percentage-text { font-size: 0.85rem; color: #00ffff; text-shadow: 0 0 8px #00ffff; font-weight: bold; }
+        #day-percentage-text { font-size: 0.9rem; color: #00ffff; text-shadow: 0 0 8px #00ffff; font-weight: bold; }
 
         .shake-toggle-container {
             position: absolute; top: 25px; right: 25px; z-index: 100; display: flex; align-items: center; gap: 8px; cursor: pointer; pointer-events: auto;
@@ -113,12 +111,11 @@
     const percentEl = document.getElementById('percentage');
     const dayBar = document.getElementById('day-bar');
     const dayPercentText = document.getElementById('day-percentage-text');
-    const uiContainer = document.getElementById('uiContainer');
     const shakeSwitch = document.getElementById('shakeSwitch');
 
     let width, height, audioCtx = null;
     let particles = [], droplets = [], pulses = [];
-    let yearRatio = 0;
+    let currentYearRatio = 0;
     let lastSec = -1;
 
     function resize() {
@@ -128,19 +125,22 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // 60秒パルス演出
     class RisingPulse {
-        constructor(y) { this.x = width/2; this.y = y; this.r = 0; this.alpha = 1.0; }
-        update() { this.r += 10; this.y -= 5; this.alpha -= 0.02; return this.alpha > 0; }
+        constructor(startY) {
+            this.x = width / 2; this.y = startY; this.r = 0; this.opacity = 1.0;
+        }
+        update() { 
+            this.r += 12; this.y -= 5; this.opacity -= 0.02; 
+            return this.opacity > 0; 
+        }
         draw() {
             ctx.beginPath();
-            ctx.ellipse(this.x, this.y, this.r * 2.5, this.r, 0, 0, Math.PI*2);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${this.alpha})`;
-            ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.ellipse(this.x, this.y, this.r * 2.5, this.r, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
+            ctx.lineWidth = 2; ctx.stroke();
         }
     }
 
-    // パーティクル（波面に当たると消える）
     class Particle {
         constructor(isFlying = false) {
             this.x = Math.random() * width;
@@ -149,12 +149,13 @@
             this.vy = isFlying ? -(Math.random() * 12 + 5) : Math.random() * 2 + 1;
             this.size = Math.random() * 2 + 1;
         }
-        update(waveY) {
+        update(waveYAtX) {
             this.x += this.vx; this.y += this.vy;
-            return (this.y < waveY); // 波面より上なら生存
+            // その地点の波の高さに触れたら消える
+            return (this.y < waveYAtX);
         }
         draw() {
-            ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+            ctx.fillStyle = `rgba(0, 255, 255, 0.8)`;
             ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
         }
     }
@@ -171,58 +172,93 @@
         }
     }
 
-    function run() {
+    function animate(t) {
         const now = new Date();
         const year = 2026;
-        const start = new Date(year, 0, 1).getTime();
-        const end = new Date(year + 1, 0, 1).getTime();
+        const startYear = new Date(year, 0, 1).getTime();
+        const endYear = new Date(year + 1, 0, 1).getTime();
         const nowMs = now.getTime();
         
-        const total = (end - start) / 1000;
-        const remaining = Math.max(0, (end - nowMs) / 1000);
-        yearRatio = remaining / total; // 残り割合
+        const totalYearSec = (endYear - startYear) / 1000;
+        const remainingSec = Math.max(0, (endYear - nowMs) / 1000);
+        currentYearRatio = remainingSec / totalYearSec;
 
-        // タイマー更新
-        const currentSec = Math.floor(remaining);
-        counterEl.textContent = currentSec.toLocaleString();
-        totalEl.textContent = "/ " + Math.floor(total).toLocaleString();
-        percentEl.textContent = "(" + (yearRatio * 100).toFixed(4) + "%)";
+        // UI更新
+        const floorSec = Math.floor(remainingSec);
+        counterEl.textContent = floorSec.toLocaleString();
+        totalEl.textContent = "/ " + Math.floor(totalYearSec).toLocaleString();
+        percentEl.textContent = "(" + (currentYearRatio * 100).toFixed(4) + "%)";
 
-        // デイリー進捗
-        const dayStart = new Date(year, now.getMonth(), now.getDate()).getTime();
-        const dayPassed = (nowMs - dayStart) / (24 * 60 * 60 * 1000);
-        dayBar.style.width = (dayPassed * 100) + "%";
-        dayPercentText.textContent = (dayPassed * 100).toFixed(2) + "%";
+        const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const dayPassedRatio = (nowMs - startDay) / (24 * 60 * 60 * 1000);
+        dayBar.style.width = (dayPassedRatio * 100) + "%";
+        dayPercentText.textContent = (dayPassedRatio * 100).toFixed(2) + "%";
 
-        // 描画
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, width, height);
 
-        // 水位：残り秒数が減るほど溜まる（ratioが1から0に近づくほど、baseYは下から上に）
-        const baseY = height * yearRatio;
-        
-        // パルス生成
-        if (currentSec % 60 === 0 && currentSec !== lastSec) {
-            pulses.push(new RisingPulse(baseY));
-            lastSec = currentSec;
+        // 水位：残り秒数が減るほど溜まる (Ratioが0に近づくほどbasePileYが小さくなる＝上がる)
+        const basePileY = height * currentYearRatio; 
+
+        // 60秒パルス判定
+        if (floorSec % 60 === 0 && floorSec !== lastSec) {
+            pulses.push(new RisingPulse(basePileY));
+            lastSec = floorSec;
         }
 
-        // 波の描画 (切れ防止のため -50 ～ width+50)
-        let grad = ctx.createLinearGradient(0, baseY - 50, 0, height);
+        // 波の描画（端の切れを防ぐため -20 から width+20 まで）
+        let grad = ctx.createLinearGradient(0, basePileY - 100, 0, height);
         grad.addColorStop(0, 'rgba(0, 255, 255, 0.7)');
         grad.addColorStop(1, 'rgba(0, 15, 50, 0.9)');
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.moveTo(0, baseY);
+        
+        const firstY = basePileY + Math.sin(t * 0.002) * 8;
+        ctx.moveTo(-20, firstY);
         for(let x = -20; x <= width + 20; x += 20) {
-            const y = baseY + Math.sin(x * 0.01 + performance.now() * 0.002) * 8;
+            const y = basePileY + Math.sin(x * 0.01 + t * 0.002) * 8;
             ctx.lineTo(x, y);
         }
-        ctx.lineTo(width, height); ctx.lineTo(0, height);
+        ctx.lineTo(width + 20, height);
+        ctx.lineTo(-20, height);
         ctx.fill();
 
-        // エフェクト更新
+        // 粒子更新（波面判定を動的に計算）
         if (Math.random() > 0.8) particles.push(new Particle());
         particles = particles.filter(p => {
-            const waveYAtX = baseY + Math.sin(p.x * 0.01 + performance.now() * 0.002) * 8;
-            if (p.update(wave
+            const waveYAtX = basePileY + Math.sin(p.x * 0.01 + t * 0.002) * 8;
+            if (p.update(waveYAtX)) { p.draw(); return true; }
+            return false;
+        });
+
+        pulses = pulses.filter(p => { if (p.update()) { p.draw(); return true; } return false; });
+        droplets = droplets.filter(d => { if (d.update()) { d.draw(); return true; } return false; });
+        
+        requestAnimationFrame(animate);
+    }
+
+    async function toggleShake() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (shakeSwitch.checked) {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try { await DeviceMotionEvent.requestPermission(); } catch(e) {}
+            }
+            window.addEventListener('devicemotion', handleShake);
+        } else {
+            window.removeEventListener('devicemotion', handleShake);
+        }
+    }
+
+    function handleShake(e) {
+        let acc = e.accelerationIncludingGravity;
+        if (acc && (Math.abs(acc.x) + Math.abs(acc.y) > 22)) {
+            for(let i=0; i<15; i++) particles.push(new Particle(true));
+            for(let i=0; i<3; i++) droplets.push(new Droplet());
+        }
+    }
+
+    // 確実にスタート
+    animate(0);
+</script>
+</body>
+</html>
