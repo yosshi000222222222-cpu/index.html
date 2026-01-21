@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Aqua Glass Unified UI</title>
+    <title>Neon Aqua Glass Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -18,18 +18,19 @@
         .wet-blur { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
 
         .main-timer-wrapper { position: relative; text-align: center; }
-        #counter { font-size: 3.5rem; font-weight: 100; color: #ffffff; text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; }
-        .sub-stats { margin-top: 15px; display: flex; justify-content: center; align-items: baseline; gap: 12px; font-family: 'Courier New', Courier, monospace; width: 100%; }
-        #total-seconds { font-size: 0.75rem; color: #ffffff; opacity: 0.6; font-weight: 100; }
-        #percentage { font-size: 0.85rem; color: #ffffff; opacity: 0.8; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+        #counter { font-size: 3.2rem; font-weight: 100; color: #ffffff; text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; }
+        .sub-stats { margin-top: 15px; display: flex; justify-content: center; align-items: baseline; gap: 10px; font-family: 'Courier New', Courier, monospace; width: 100%; }
+        #total-seconds { font-size: 0.7rem; color: #ffffff; opacity: 0.5; }
+        #percentage { font-size: 0.8rem; color: #00ffff; text-shadow: 0 0 5px rgba(0,255,255,0.5); }
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
+        /* センター配置のデイリープログレス */
         .day-progress-group {
-            margin-top: 20px;
+            margin-top: 25px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 180px;
+            width: 200px;
         }
         .day-gauge-container {
             width: 100%; height: 3px; background: rgba(255,255,255,0.1);
@@ -39,14 +40,13 @@
             height: 100%; width: 0%;
             background: linear-gradient(90deg, transparent, #00ffff);
             box-shadow: 0 0 8px #00ffff;
-            transition: width 1s linear;
         }
         .day-label {
-            font-size: 0.5rem; color: #00ffff; opacity: 0.5; letter-spacing: 2px;
-            margin-bottom: 6px;
+            font-size: 0.5rem; color: #00ffff; opacity: 0.6; letter-spacing: 2px;
+            margin-bottom: 8px;
         }
 
-        /* 右上のトグルスイッチスタイル */
+        /* 右上のトグルスイッチ */
         .shake-toggle-container {
             position: absolute; top: 25px; right: 25px;
             z-index: 100; display: flex; align-items: center; gap: 8px;
@@ -54,15 +54,153 @@
         }
         .shake-toggle-container input { display: none; }
         .slider {
-            width: 34px; height: 18px;
-            background: rgba(255,255,255,0.1);
+            width: 40px; height: 20px;
+            background: rgba(255,255,255,0.05);
             border: 1px solid rgba(255,0,0,0.3);
             border-radius: 10px; position: relative; transition: .3s;
         }
         .slider:before {
-            content: ""; position: absolute; height: 12px; width: 12px;
-            left: 2px; bottom: 2px; background: #550000; border-radius: 50%; transition: .3s;
+            content: ""; position: absolute; height: 14px; width: 14px;
+            left: 2px; bottom: 2px; background: #440000; border-radius: 50%; transition: .3s;
         }
-        input:checked + .slider { background: rgba(0,255,255,0.3); border-color: #00ffff; }
-        input:checked + .slider:before { transform: translateX(16px); background: #00ffff; box-shadow: 0 0 10px #00ffff; }
-        .toggle-label { color: #5
+        input:checked + .slider { border-color: #00ffff; background: rgba(0,255,255,0.1); }
+        input:checked + .slider:before { transform: translateX(20px); background: #00ffff; box-shadow: 0 0 10px #00ffff; }
+        .toggle-label { color: #440000; font-size: 10px; font-weight: bold; letter-spacing: 1px; transition: .3s; }
+        input:checked ~ .toggle-label { color: #00ffff; }
+    </style>
+</head>
+<body>
+
+<label class="shake-toggle-container">
+    <input type="checkbox" id="shakeSwitch" onchange="toggleShake()">
+    <div class="slider"></div>
+    <span class="toggle-label">SHAKE</span>
+</label>
+
+<div class="ui-container" id="uiContainer">
+    <div class="label">REMAINING SECONDS</div>
+    <div class="main-timer-wrapper">
+        <div id="counter">0</div>
+        <div class="sub-stats">
+            <span id="total-seconds">/ 0</span>
+            <span id="percentage">(0.0000%)</span>
+        </div>
+        
+        <div class="day-progress-group">
+            <div class="day-label">TODAY'S PROGRESS</div>
+            <div class="day-gauge-container">
+                <div id="day-bar"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const counterEl = document.getElementById('counter');
+    const totalEl = document.getElementById('total-seconds');
+    const percentEl = document.getElementById('percentage');
+    const dayBar = document.getElementById('day-bar');
+    const uiContainer = document.getElementById('uiContainer');
+    const shakeSwitch = document.getElementById('shakeSwitch');
+
+    let width, height;
+    let particles = [];
+    let pulses = [];
+    let droplets = [];
+    let lastPulseSecond = -1;
+    let audioCtx = null;
+
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Droplet {
+        constructor() {
+            this.x = Math.random() * width;
+            this.y = Math.random() * height;
+            this.r = Math.random() * Math.random() * 7 + 1;
+            this.life = 1.0;
+            this.vy = this.r * 0.05;
+        }
+        update() {
+            this.y += this.vy;
+            this.life -= 0.0015;
+            return this.life > 0;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.25})`;
+            ctx.fill();
+        }
+    }
+
+    function playSplashSound() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(100 + Math.random() * 100, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+    }
+
+    function getWaveY(x, time, basePileY) {
+        return basePileY + Math.sin(x * 0.008 + time * 0.0008) * 6;
+    }
+
+    class Particle {
+        constructor(isFlying = false) {
+            this.x = Math.random() * width;
+            this.y = isFlying ? height - 50 : -20;
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = isFlying ? -(Math.random() * 15 + 5) : Math.random() * 2 + 1;
+            this.size = Math.random() * 2 + 1;
+            this.isAbsorbed = false;
+            this.life = 1.0;
+        }
+        update(time, basePileY) {
+            const currentYAtX = getWaveY(this.x, time, basePileY);
+            if (!this.isAbsorbed) {
+                this.x += this.vx; this.y += this.vy;
+                if (this.y > -20) this.vy += 0.1;
+                if (this.y >= currentYAtX) { this.isAbsorbed = true; this.y = currentYAtX; }
+            } else {
+                this.life -= 0.012;
+            }
+            return this.life > 0;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(0, 255, 255, ${this.life})`;
+            ctx.fill();
+        }
+    }
+
+    function animate(time) {
+        const now = new Date();
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+        const endOfYear = new Date(now.getFullYear() + 1, 0, 1);
+        const totalYearSec = Math.floor((endOfYear - startOfYear) / 1000);
+        const secondsPassed = Math.floor((now - startOfYear) / 1000);
+        const secondsLeft = totalYearSec - secondsPassed;
+
+        // UIテキスト更新
+        counterEl.innerText = secondsLeft.toLocaleString();
+        totalEl.innerText = "/ " + totalYearSec.toLocaleString();
+        percentEl.innerText = "(" + ((secondsLeft / totalYearSec) * 100).toFixed(4) + "%)";
+
+        // デイリーゲージ更新
+        const daySecondsPassed = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
+        dayBar.style.width = (daySecondsPassed / 86400 * 100
