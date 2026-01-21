@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Aqua Glass - Full Width Wave</title>
+    <title>Neon Aqua Glass - Fixed Timer</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -14,11 +14,7 @@
             color: white; pointer-events: none; z-index: 10; width: 100%;
         }
 
-        .wet-blur { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
-
-        .main-timer-wrapper { position: relative; text-align: center; width: 100%; }
-        
-        /* 安定版サイズ 3.5rem */
+        /* タイマー文字サイズ：安定版 3.5rem */
         #counter { 
             font-size: 3.5rem; font-weight: bold; color: #ffffff; 
             text-shadow: 0 0 20px rgba(255,255,255,0.8); margin: 0; line-height: 1.1; 
@@ -29,7 +25,7 @@
         #percentage { font-size: 0.85rem; color: #00ffff; text-shadow: 0 0 5px rgba(0,255,255,0.5); }
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
-        /* デイリーゲージ：幅いっぱい */
+        /* プログレスゲージ：幅いっぱい */
         .day-progress-group {
             margin-top: 50px; display: flex; flex-direction: column; width: 100%; position: relative;
         }
@@ -41,7 +37,7 @@
             box-shadow: 0 0 15px #00ffff; position: absolute; top: 0; left: 0; z-index: 2;
         }
         
-        /* 目盛り */
+        /* 4時間ごとの目盛り */
         .scale-marks {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; justify-content: space-between; z-index: 3;
@@ -54,11 +50,11 @@
             transform: translateX(-50%); font-size: 8px; color: rgba(0, 255, 255, 0.4);
         }
 
+        /* デイリー情報の右下配置 */
         .day-info-row {
-            display: flex; justify-content: space-between; align-items: flex-end;
-            padding: 0 20px; margin-top: 15px;
+            display: flex; justify-content: flex-end; /* 右寄せ */
+            padding: 0 20px; margin-top: 10px;
         }
-        .day-label { font-size: 0.5rem; color: #00ffff; opacity: 0.4; letter-spacing: 2px; }
         #day-percentage-text { font-size: 0.85rem; color: #00ffff; text-shadow: 0 0 8px #00ffff; font-weight: bold; }
 
         .shake-toggle-container {
@@ -82,9 +78,9 @@
 </label>
 
 <div class="ui-container" id="uiContainer">
-    <div class="label">REMAINING SECONDS</div>
+    <div class="label">REMAINING SECONDS (2026)</div>
     <div class="main-timer-wrapper">
-        <div id="counter">INITIALIZING...</div>
+        <div id="counter">---</div>
         <div class="sub-stats">
             <span id="total-seconds"></span>
             <span id="percentage"></span>
@@ -101,7 +97,6 @@
                 </div>
             </div>
             <div class="day-info-row">
-                <div class="day-label">TODAY'S PROGRESS</div>
                 <div id="day-percentage-text">0.00%</div>
             </div>
         </div>
@@ -123,8 +118,8 @@
 
     let width, height, audioCtx = null;
     let particles = [], droplets = [], pulses = [];
-    let currentYearRatio = 0;
-    let lastPulseSecond = -1;
+    let yearRatio = 0;
+    let lastSec = -1;
 
     function resize() {
         width = canvas.width = window.innerWidth;
@@ -133,19 +128,19 @@
     window.addEventListener('resize', resize);
     resize();
 
+    // 60秒パルス演出
     class RisingPulse {
-        constructor(startY) {
-            this.x = width / 2; this.y = startY; this.r = 0; this.opacity = 1.0;
-        }
-        update() { this.r += 12; this.y -= 6; this.opacity -= 0.02; return this.opacity > 0; }
+        constructor(y) { this.x = width/2; this.y = y; this.r = 0; this.alpha = 1.0; }
+        update() { this.r += 10; this.y -= 5; this.alpha -= 0.02; return this.alpha > 0; }
         draw() {
             ctx.beginPath();
-            ctx.ellipse(this.x, this.y, this.r * 2.5, this.r, 0, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
-            ctx.lineWidth = 2; ctx.stroke();
+            ctx.ellipse(this.x, this.y, this.r * 2.5, this.r, 0, 0, Math.PI*2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.alpha})`;
+            ctx.lineWidth = 1.5; ctx.stroke();
         }
     }
 
+    // パーティクル（波面に当たると消える）
     class Particle {
         constructor(isFlying = false) {
             this.x = Math.random() * width;
@@ -153,16 +148,13 @@
             this.vx = (Math.random() - 0.5) * 2;
             this.vy = isFlying ? -(Math.random() * 12 + 5) : Math.random() * 2 + 1;
             this.size = Math.random() * 2 + 1;
-            this.life = 1.0;
         }
-        update(waveYAtX) {
+        update(waveY) {
             this.x += this.vx; this.y += this.vy;
-            // 粒が波面に当たったら消える
-            if (this.y >= waveYAtX) { this.life = 0; }
-            return this.life > 0;
+            return (this.y < waveY); // 波面より上なら生存
         }
         draw() {
-            ctx.fillStyle = `rgba(0, 255, 255, ${this.life})`;
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
             ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
         }
     }
@@ -179,4 +171,58 @@
         }
     }
 
-    function animate(t) {
+    function run() {
+        const now = new Date();
+        const year = 2026;
+        const start = new Date(year, 0, 1).getTime();
+        const end = new Date(year + 1, 0, 1).getTime();
+        const nowMs = now.getTime();
+        
+        const total = (end - start) / 1000;
+        const remaining = Math.max(0, (end - nowMs) / 1000);
+        yearRatio = remaining / total; // 残り割合
+
+        // タイマー更新
+        const currentSec = Math.floor(remaining);
+        counterEl.textContent = currentSec.toLocaleString();
+        totalEl.textContent = "/ " + Math.floor(total).toLocaleString();
+        percentEl.textContent = "(" + (yearRatio * 100).toFixed(4) + "%)";
+
+        // デイリー進捗
+        const dayStart = new Date(year, now.getMonth(), now.getDate()).getTime();
+        const dayPassed = (nowMs - dayStart) / (24 * 60 * 60 * 1000);
+        dayBar.style.width = (dayPassed * 100) + "%";
+        dayPercentText.textContent = (dayPassed * 100).toFixed(2) + "%";
+
+        // 描画
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, width, height);
+
+        // 水位：残り秒数が減るほど溜まる（ratioが1から0に近づくほど、baseYは下から上に）
+        const baseY = height * yearRatio;
+        
+        // パルス生成
+        if (currentSec % 60 === 0 && currentSec !== lastSec) {
+            pulses.push(new RisingPulse(baseY));
+            lastSec = currentSec;
+        }
+
+        // 波の描画 (切れ防止のため -50 ～ width+50)
+        let grad = ctx.createLinearGradient(0, baseY - 50, 0, height);
+        grad.addColorStop(0, 'rgba(0, 255, 255, 0.7)');
+        grad.addColorStop(1, 'rgba(0, 15, 50, 0.9)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(0, baseY);
+        for(let x = -20; x <= width + 20; x += 20) {
+            const y = baseY + Math.sin(x * 0.01 + performance.now() * 0.002) * 8;
+            ctx.lineTo(x, y);
+        }
+        ctx.lineTo(width, height); ctx.lineTo(0, height);
+        ctx.fill();
+
+        // エフェクト更新
+        if (Math.random() > 0.8) particles.push(new Particle());
+        particles = particles.filter(p => {
+            const waveYAtX = baseY + Math.sin(p.x * 0.01 + performance.now() * 0.002) * 8;
+            if (p.update(wave
