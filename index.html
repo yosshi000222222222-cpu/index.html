@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Skyblue Glass - Fixed Accumulate</title>
+    <title>Neon Skyblue Glass - Refined Progress</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -23,21 +23,18 @@
         
         .sub-stats { margin-top: 15px; display: flex; justify-content: center; align-items: baseline; gap: 12px; width: 100%; }
         #total-seconds { font-size: 0.75rem; color: #ffffff; opacity: 0.6; }
-        /* パーセント色をスカイブルーに変更 */
+        /* タイマー側の％サイズ：0.85rem */
         #percentage { font-size: 0.85rem; color: #29b6f6; text-shadow: 0 0 5px rgba(41, 182, 246, 0.5); }
         .label { font-size: 0.6rem; letter-spacing: 2px; color: #ffffff; opacity: 0.5; margin-bottom: 5px; }
         
-        /* デイリーゲージ：幅を少し縮めて中央寄せ */
         .day-progress-group {
-            margin-top: 60px; display: flex; flex-direction: column; 
-            width: 94%; /* 両端が見切れないように調整 */
-            margin-left: auto; margin-right: auto;
+            margin-top: 70px; display: flex; flex-direction: column; 
+            width: 94%; margin-left: auto; margin-right: auto;
             position: relative;
         }
         .day-gauge-container {
             width: 100%; height: 2px; background: rgba(255,255,255,0.1); position: relative;
         }
-        /* ゲージバーの色をスカイブルーに変更 */
         #day-bar {
             height: 100%; width: 0%; background: linear-gradient(90deg, transparent, #29b6f6);
             box-shadow: 0 0 15px #29b6f6; position: absolute; top: 0; left: 0; z-index: 2;
@@ -47,19 +44,26 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; justify-content: space-between; z-index: 3;
         }
-        /* 目盛りの色をスカイブルー系に変更 */
         .mark { width: 1px; height: 10px; background: rgba(41, 182, 246, 0.3); position: relative; top: -4px; }
+        
+        /* 目盛り数字をゲージの上に配置 */
         .mark::after {
-            content: attr(data-hour); position: absolute; top: 14px; left: 50%;
-            transform: translateX(-50%); font-size: 8px; color: rgba(41, 182, 246, 0.5);
+            content: attr(data-hour); position: absolute; 
+            bottom: 14px; left: 50%; transform: translateX(-50%); 
+            font-size: 8px; color: rgba(41, 182, 246, 0.5);
         }
 
         .day-info-row {
             display: flex; justify-content: flex-end; 
             padding-top: 12px;
         }
-        /* テキストの色をスカイブルーに変更 */
-        #day-percentage-text { font-size: 0.9rem; color: #29b6f6; text-shadow: 0 0 8px #29b6f6; font-weight: bold; }
+        /* デイリーの％をタイマー側の％と同じサイズ（0.85rem）に修正 */
+        #day-percentage-text { 
+            font-size: 0.85rem; 
+            color: #29b6f6; 
+            text-shadow: 0 0 5px rgba(41, 182, 246, 0.5); 
+            font-weight: bold; 
+        }
 
         .shake-toggle-container {
             position: absolute; top: 25px; right: 25px; z-index: 100; display: flex; align-items: center; gap: 8px; cursor: pointer; pointer-events: auto;
@@ -67,7 +71,6 @@
         .shake-toggle-container input { display: none; }
         .slider { width: 40px; height: 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,0,0,0.2); border-radius: 10px; position: relative; transition: .3s; }
         .slider:before { content: ""; position: absolute; height: 14px; width: 14px; left: 2px; bottom: 2px; background: #440000; border-radius: 50%; transition: .3s; }
-        /* スイッチON時の色をスカイブルーに変更 */
         input:checked + .slider { border-color: #29b6f6; background: rgba(41, 182, 246, 0.2); }
         input:checked + .slider:before { transform: translateX(20px); background: #29b6f6; box-shadow: 0 0 10px #29b6f6; }
         .toggle-label { color: #440000; font-size: 9px; font-weight: bold; letter-spacing: 1px; }
@@ -121,7 +124,7 @@
     const shakeSwitch = document.getElementById('shakeSwitch');
 
     let width, height, audioCtx = null;
-    let particles = [], droplets = [], pulses = [];
+    let particles = [], pulses = [];
     let currentYearRatio = 0;
     let lastSec = -1;
 
@@ -136,10 +139,7 @@
         constructor(startY) {
             this.x = width / 2; this.y = startY; this.r = 0; this.opacity = 1.0;
         }
-        update() { 
-            this.r += 12; this.y -= 5; this.opacity -= 0.02; 
-            return this.opacity > 0; 
-        }
+        update() { this.r += 12; this.y -= 5; this.opacity -= 0.02; return this.opacity > 0; }
         draw() {
             ctx.beginPath();
             ctx.ellipse(this.x, this.y, this.r * 2.5, this.r, 0, 0, Math.PI * 2);
@@ -161,21 +161,8 @@
             return (this.y < waveYAtX);
         }
         draw() {
-            // 粒子の色もスカイブルー系に
             ctx.fillStyle = `rgba(41, 182, 246, 0.8)`;
             ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
-        }
-    }
-
-    class Droplet {
-        constructor() {
-            this.x = Math.random() * width; this.y = Math.random() * height;
-            this.r = Math.random() * 5 + 1; this.life = 1.0; this.vy = this.r * 0.05;
-        }
-        update() { this.y += this.vy; this.life -= 0.002; return this.life > 0; }
-        draw() {
-            ctx.fillStyle = `rgba(255, 255, 255, ${this.life * 0.2})`;
-            ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
         }
     }
 
@@ -210,57 +197,6 @@
             lastSec = floorSec;
         }
 
-        // 波のグラデーションは変更せず維持
         let grad = ctx.createLinearGradient(0, basePileY - 100, 0, height);
         grad.addColorStop(0, 'rgba(0, 255, 255, 0.7)');
-        grad.addColorStop(1, 'rgba(0, 15, 50, 0.9)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        
-        const firstY = basePileY + Math.sin(t * 0.002) * 8;
-        ctx.moveTo(-20, firstY);
-        for(let x = -20; x <= width + 20; x += 20) {
-            const y = basePileY + Math.sin(x * 0.01 + t * 0.002) * 8;
-            ctx.lineTo(x, y);
-        }
-        ctx.lineTo(width + 20, height);
-        ctx.lineTo(-20, height);
-        ctx.fill();
-
-        if (Math.random() > 0.8) particles.push(new Particle());
-        particles = particles.filter(p => {
-            const waveYAtX = basePileY + Math.sin(p.x * 0.01 + t * 0.002) * 8;
-            if (p.update(waveYAtX)) { p.draw(); return true; }
-            return false;
-        });
-
-        pulses = pulses.filter(p => { if (p.update()) { p.draw(); return true; } return false; });
-        droplets = droplets.filter(d => { if (d.update()) { d.draw(); return true; } return false; });
-        
-        requestAnimationFrame(animate);
-    }
-
-    async function toggleShake() {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (shakeSwitch.checked) {
-            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                try { await DeviceMotionEvent.requestPermission(); } catch(e) {}
-            }
-            window.addEventListener('devicemotion', handleShake);
-        } else {
-            window.removeEventListener('devicemotion', handleShake);
-        }
-    }
-
-    function handleShake(e) {
-        let acc = e.accelerationIncludingGravity;
-        if (acc && (Math.abs(acc.x) + Math.abs(acc.y) > 22)) {
-            for(let i=0; i<15; i++) particles.push(new Particle(true));
-            for(let i=0; i<3; i++) droplets.push(new Droplet());
-        }
-    }
-
-    animate(0);
-</script>
-</body>
-</html>
+        grad.addColorStop(1, 'rgba(0, 15, 50, 0
